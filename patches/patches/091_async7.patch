@@ -1,0 +1,13 @@
+--- exercises/091_async7.zig	2026-04-02 10:50:08.142508099 +0200
++++ answers/091_async7.zig	2026-04-02 10:49:59.629341593 +0200
+@@ -49,8 +49,8 @@
+     for (0..times) |_| {
+         // Acquire the lock before modifying shared state.
+         // What Mutex method blocks until the lock is acquired?
+-        state.mutex.??? catch return;
+-        defer state.mutex.unlock(); // <-- what's missing here?
++        state.mutex.lock(io) catch return;
++        defer state.mutex.unlock(io);
+ 
+         state.counter += 1;
+     }
