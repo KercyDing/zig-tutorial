@@ -112,18 +112,7 @@ const Mode = enum {
     random,
 };
 
-pub const logo =
-    \\         _       _ _
-    \\     ___(_) __ _| (_)_ __   __ _ ___
-    \\    |_  | |/ _' | | | '_ \ / _' / __|
-    \\     / /| | (_| | | | | | | (_| \__ \
-    \\    /___|_|\__, |_|_|_| |_|\__, |___/
-    \\           |___/           |___/
-    \\
-    \\    "Look out! Broken programs below!"
-    \\
-    \\
-;
+pub const logo = @embedFile("banner.txt");
 
 const progress_filename = ".progress.txt";
 
