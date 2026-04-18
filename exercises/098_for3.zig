@@ -56,7 +56,7 @@ pub fn main() void {
 
     // I want to print every number between 1 and 20 that is NOT
     // divisible by 3 or 5.
-    for (???) |n| {
+    for (1..21) |n| {
 
         // The '%' symbol is the "modulo" operator and it
         // returns the remainder after division.
@@ -68,7 +68,7 @@ pub fn main() void {
     std.debug.print("\n", .{});
 
     // Let's also print every number from 1 through 15
-    for (???) |n| {
+    for (1..16) |n| {
         std.debug.print("{} ", .{n});
     }
     std.debug.print("\n", .{});

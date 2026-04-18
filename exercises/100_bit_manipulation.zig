@@ -80,7 +80,7 @@ pub fn main() !void {
     y ^= x;
 
     // What must be written here?
-    ???;
+    x ^= y;
 
     print("x = {b}; y = {b}\n", .{ x, y });
 }
