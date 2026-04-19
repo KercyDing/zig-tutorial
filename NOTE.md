@@ -14,6 +14,6 @@
 
 - [074_comptime9](exercises/074_comptime9.zig)
 
-> NOTE!
+> NOTICE!
 >
 > Temporarily skip sections 85-95(async).

@@ -1,6 +1,6 @@
 //
 // Prerequisite :
-//    - exercise/106_files.zig, or
+//    - exercise/109_files.zig, or
 //    - create a file {project_root}/output/zigling.txt
 //      with content `It's zigling time!`(18 bytes total)
 //
@@ -39,7 +39,7 @@ pub fn main(init: std.process.Init) !void {
     // initialize an array of u8 with all letter 'A'
     // we need to pick the size of the array, 64 seems like a good number
     // fix the initialization below
-    var content = ['A']*64;
+    var content = [_]u8{'A'} ** 64;
     // this should print out : `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`
     std.debug.print("{s}\n", .{content});
 
@@ -50,12 +50,12 @@ pub fn main(init: std.process.Init) !void {
     // can you go here to find a way to read the content?
     // https://ziglang.org/documentation/master/std/#std.Io.Reader
     // hint: look for a method that reads into a slice
-    const bytes_read = zig_read_the_file_or_i_will_fight_you(&content);
+    const bytes_read = try reader.readSliceShort(&content);
 
     // Woah, too screamy. I know you're excited for zigling time but tone it down a bit.
     // Can you print only what we read from the file?
     std.debug.print("Successfully Read {d} bytes: {s}\n", .{
         bytes_read,
-        content, // change this line only
+        content[0..bytes_read], // change this line only
     });
 }

@@ -6,7 +6,7 @@
 //
 //     // In a task:
 //     try mutex.lock(io);       // blocks until lock is acquired
-//     defer mutex.unlock();
+//     defer mutex.unlock(io);
 //     // ... critical section: safe to modify shared data ...
 //
 // Without the mutex, concurrent tasks could read and write the
@@ -51,6 +51,12 @@ fn increment(io: std.Io, state: *SharedState, times: u32) void {
         // What Mutex method blocks until the lock is acquired?
         state.mutex.??? catch return;
         defer state.mutex.unlock(); // <-- what's missing here?
+
+        // Sleep to give the other tasks a chance to run in the meantime.
+        // We do this here only to make nondeterminism more visible.
+        io.sleep(std.Io.Duration.fromMilliseconds(1), .awake) catch {};
+
+        // What happens if you neglect to lock the mutex?
 
         state.counter += 1;
     }

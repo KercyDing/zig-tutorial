@@ -45,8 +45,9 @@ const Io = std.Io;
 const print = std.debug.print;
 
 const SearchResult = struct {
-    worker_id: u8,
-    index: usize,
+    found: bool,
+    worker_id: u8 = 0,
+    index: usize = 0,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -71,7 +72,8 @@ pub fn main(init: std.process.Init) !void {
     // Wait for the first result.
     const result = try queue.getOne(io);
 
-    print("Worker {} found signal start over threshold at index {}!\n", .{ result.worker_id, result.index });
+    if (result.found)
+        print("Worker {} found signal start over threshold at index {}!\n", .{ result.worker_id, result.index });
 }
 
 fn searchThreshold(
@@ -94,10 +96,14 @@ fn searchThreshold(
 
         if (val >= threshold) {
             queue.putOne(io, .{
+                .found = true,
                 .worker_id = worker_id,
                 .index = base_offset + i,
             }) catch return;
             return;
         }
     }
+
+    // Nothing found
+    queue.putOneUncancelable(io, .{ .found = false }) catch return;
 }

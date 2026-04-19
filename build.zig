@@ -194,7 +194,8 @@ pub fn build(b: *Build) !void {
             break :blk seed;
         });
         const rnd = prng.random();
-        const ex = exercises[rnd.intRangeLessThan(usize, 0, exercises.len)];
+        const num = rnd.intRangeLessThan(usize, 0, exercises.len);
+        const ex = exercises[num];
 
         print("random exercise: {s}\n", .{ex.main_file});
 
@@ -259,11 +260,9 @@ pub fn build(b: *Build) !void {
 
         const progress_file_size = try progress_file.length(io);
 
-        var gpa = std.heap.DebugAllocator(.{}){};
-        defer _ = gpa.deinit();
-        const allocator = gpa.allocator();
-        const contents = try allocator.alloc(u8, progress_file_size);
-        defer allocator.free(contents);
+        var gpa = b.allocator;
+        const contents = try gpa.alloc(u8, progress_file_size);
+        defer gpa.free(contents);
         var file_buffer: [1024]u8 = undefined;
         var file_reader = progress_file.reader(io, &file_buffer);
         // try file_reader.interface.readSliceAll(contents);
@@ -335,6 +334,26 @@ const ZiglingStep = struct {
         return self;
     }
 
+    fn printProgress(num: usize, max: usize) void {
+        const bar_width: u32 = 60;
+
+        const filled_len_u64 = (@as(u64, num) * bar_width) / max;
+        const filled_len = @as(u32, @intCast(filled_len_u64));
+
+        var bar_buf: [bar_width]u8 = undefined;
+
+        for (0..bar_width) |n| {
+            const ord = std.math.order(n, filled_len);
+            bar_buf[n] = switch (ord) {
+                .lt => '#',
+                .eq => '>',
+                .gt => '-',
+            };
+        }
+
+        std.debug.print("\rProgress: [{s}]  {d}/{d}\n\n", .{ &bar_buf, num, max });
+    }
+
     fn make(step: *Step, options: Step.MakeOptions) !void {
         // NOTE: Using exit code 2 will prevent the Zig compiler to print the message:
         // "error: the following build command failed with exit code 1:..."
@@ -349,6 +368,9 @@ const ZiglingStep = struct {
             print("\n\n", .{});
             return;
         }
+
+        // Progess
+        printProgress(self.exercise.number(), exercises.len - 1);
 
         const exe_path = self.compile(options.progress_node) catch {
             self.printErrors();
@@ -377,6 +399,7 @@ const ZiglingStep = struct {
     fn run(self: *ZiglingStep, exe_path: []const u8, _: std.Progress.Node) !void {
         resetLine();
         const b = self.step.owner;
+        const gpa = b.allocator;
         const io = b.graph.io;
 
         print("Checking: {s}\n", .{self.exercise.main_file});
@@ -384,7 +407,7 @@ const ZiglingStep = struct {
         // Allow up to 1 MB of stdout capture.
         const max_output_bytes = 1 * 1024 * 1024;
 
-        const result = Process.run(b.allocator, io, .{
+        const result = Process.run(gpa, io, .{
             .argv = &.{exe_path},
             .cwd = .{ .path = b.build_root.path.? },
             .stdout_limit = .limited(max_output_bytes),
@@ -402,6 +425,7 @@ const ZiglingStep = struct {
 
     fn check_output(self: *ZiglingStep, result: Process.RunResult) !void {
         const b = self.step.owner;
+        const gpa = b.allocator;
         const io = b.graph.io;
 
         // Make sure it exited cleanly.
@@ -427,7 +451,7 @@ const ZiglingStep = struct {
 
         // NOTE: exercise.output can never contain a CR character.
         // See https://ziglang.org/documentation/master/#Source-Encoding.
-        const output = trimLines(b.allocator, raw_output) catch @panic("OOM");
+        const output = trimLines(gpa, raw_output) catch @panic("OOM");
 
         // Validate the output.
         var exercise_output = self.exercise.output;
@@ -475,8 +499,8 @@ const ZiglingStep = struct {
             , .{ red, reset, exercise_output, red, reset, output, red, reset });
         }
 
-        const progress = try std.fmt.allocPrint(b.allocator, "{d}", .{self.exercise.number()});
-        defer b.allocator.free(progress);
+        const progress = try std.fmt.allocPrint(gpa, "{d}", .{self.exercise.number()});
+        defer gpa.free(progress);
 
         const file = try std.Io.Dir.cwd().createFile(
             io,
@@ -515,43 +539,44 @@ const ZiglingStep = struct {
         print("Compiling: {s}\n", .{self.exercise.main_file});
 
         const b = self.step.owner;
+        const gpa = b.allocator;
         const exercise_path = self.exercise.main_file;
-        const path = join(b.allocator, &.{ self.work_path, exercise_path }) catch
+        const path = join(gpa, &.{ self.work_path, exercise_path }) catch
             @panic("OOM");
 
-        var zig_args = std.array_list.Managed([]const u8).init(b.allocator);
-        defer zig_args.deinit();
+        var zig_args = std.ArrayList([]const u8).initCapacity(gpa, 10) catch @panic("OOM");
+        defer zig_args.deinit(gpa);
 
-        zig_args.append(b.graph.zig_exe) catch @panic("OOM");
+        zig_args.append(gpa, b.graph.zig_exe) catch @panic("OOM");
 
         const cmd = switch (self.exercise.kind) {
             .exe => "build-exe",
             .@"test" => "test",
         };
-        zig_args.append(cmd) catch @panic("OOM");
+        zig_args.append(gpa, cmd) catch @panic("OOM");
 
         // Enable C support for exercises that use C functions.
         if (self.exercise.link_libc) {
-            zig_args.append("-lc") catch @panic("OOM");
-            zig_args.append("-fllvm") catch @panic("OOM");
+            zig_args.append(gpa, "-lc") catch @panic("OOM");
+            zig_args.append(gpa, "-fllvm") catch @panic("OOM");
         }
 
         if (b.reference_trace) |rt| {
-            zig_args.append(b.fmt("-freference-trace={}", .{rt})) catch @panic("OOM");
+            zig_args.append(gpa, b.fmt("-freference-trace={}", .{rt})) catch @panic("OOM");
         }
 
-        zig_args.append(b.pathFromRoot(path)) catch @panic("OOM");
+        zig_args.append(gpa, b.pathFromRoot(path)) catch @panic("OOM");
 
-        zig_args.append("--cache-dir") catch @panic("OOM");
-        zig_args.append(b.pathFromRoot(b.cache_root.path.?)) catch @panic("OOM");
+        zig_args.append(gpa, "--cache-dir") catch @panic("OOM");
+        zig_args.append(gpa, b.pathFromRoot(b.cache_root.path.?)) catch @panic("OOM");
 
-        zig_args.append("--listen=-") catch @panic("OOM");
+        zig_args.append(gpa, "--listen=-") catch @panic("OOM");
 
         //
         // NOTE: After many changes in zig build system, we need to create the cache path manually.
         // See https://github.com/ziglang/zig/pull/21115
         // Maybe there is a better way (in the future).
-        const exe_dir = try self.step.evalZigProcess(zig_args.items, prog_node, false, null, b.allocator);
+        const exe_dir = try self.step.evalZigProcess(zig_args.items, prog_node, false, null, gpa);
         const exe_name = switch (self.exercise.kind) {
             .exe => self.exercise.name(),
             .@"test" => "test",
@@ -617,21 +642,22 @@ fn resetLine() void {
 
 /// Removes trailing whitespace for each line in buf, also ensuring that there
 /// are no trailing LF characters at the end.
-pub fn trimLines(allocator: std.mem.Allocator, buf: []const u8) ![]const u8 {
-    var list = try std.array_list.Aligned(u8, null).initCapacity(allocator, buf.len);
+pub fn trimLines(gpa: std.mem.Allocator, buf: []const u8) ![]const u8 {
+    var list = try std.ArrayList(u8).initCapacity(gpa, buf.len);
+    errdefer list.deinit(gpa);
 
     var iter = std.mem.splitSequence(u8, buf, " \n");
     while (iter.next()) |line| {
         // TODO: trimming CR characters is probably not necessary.
         const data = std.mem.trimEnd(u8, line, " \r");
-        try list.appendSlice(allocator, data);
-        try list.append(allocator, '\n');
+        try list.appendSlice(gpa, data);
+        try list.append(gpa, '\n');
     }
 
-    const result = try list.toOwnedSlice(allocator); // TODO: probably not necessary
+    // Calls deinit()
+    const result = try list.toOwnedSlice(gpa);
 
-    // Remove the trailing LF character, that is always present in the exercise
-    // output.
+    // Remove the trailing LF character, that is always present in the exercise output.
     return std.mem.trimEnd(u8, result, "\n");
 }
 

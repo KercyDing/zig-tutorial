@@ -1,6 +1,6 @@
---- exercises/093_async9.zig	2026-04-14 08:32:33.014583120 -0700
-+++ answers/093_async9.zig	2026-04-14 08:32:24.459647047 -0700
-@@ -62,10 +62,10 @@
+--- exercises/093_async9.zig	2026-04-14 22:20:23.519107582 +0200
++++ answers/093_async9.zig	2026-04-14 22:06:30.606912044 +0200
+@@ -63,10 +63,10 @@
  
      // Launch two workers, each searching half the array.
      // Remember, we want them to be guaranteed separate units of concurrency.

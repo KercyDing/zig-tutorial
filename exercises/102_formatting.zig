@@ -13,10 +13,10 @@
 // no official documentation for standard library features such
 // as string formatting.
 //
-// Therefore, the comments for the format() function are the only
+// Therefore, the comments for the print() function are the only
 // way to definitively learn how to format strings in Zig:
 //
-//     https://codeberg.org/ziglang/zig/src/branch/master/lib/std/Io/Writer.zig#L537
+//     https://ziglang.org/documentation/master/std/#std.Io.Writer.print
 //
 // Zig already has a very nice selection of formatting options.
 // These can be used in different ways, but generally to convert
@@ -56,7 +56,7 @@
 // the placeholder will determine how the corresponding value,
 // e.g. foo, is displayed.
 //
-// And this is where it gets exciting, because format() accepts a
+// And this is where it gets exciting, because print() accepts a
 // variety of formatting instructions. It's basically a tiny
 // language of its own. Here's a numeric example:
 //
