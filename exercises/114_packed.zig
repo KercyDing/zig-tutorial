@@ -41,7 +41,7 @@
 
 const PackedStruct = packed struct {
     a: u2,
-    b: u?,
+    b: u4,
 };
 
 comptime {
@@ -50,7 +50,7 @@ comptime {
 
 const PackedUnion = packed union {
     a: bool,
-    b: u?,
+    b: u1,
 };
 
 comptime {
@@ -113,31 +113,38 @@ const Bits = packed struct(u4) {
 pub fn main() void {
     {
         const expected: Bits = @bitCast(@as(u4, 0b1000));
-        const my_bits: Bits = .{};
+        const my_bits: Bits = .{ .d = 1 };
         if (my_bits != expected) complain(my_bits, expected, @src());
     }
 
     {
         const expected: Bits = @bitCast(@as(u4, 0b0001));
-        const my_bits: Bits = .{};
+        const my_bits: Bits = .{ .a = 1 };
         if (my_bits != expected) complain(my_bits, expected, @src());
     }
 
     {
         const expected: Bits = @bitCast(@as(u4, 0b0010));
-        const my_bits: Bits = .{};
+        const my_bits: Bits = .{ .b = 1 };
         if (my_bits != expected) complain(my_bits, expected, @src());
     }
 
     {
         const expected: Bits = @bitCast(@as(u4, 0b0011));
-        const my_bits: Bits = .{};
+        const my_bits: Bits = .{
+            .a = 1,
+            .b = 1
+        };
         if (my_bits != expected) complain(my_bits, expected, @src());
     }
 
     {
         const expected: Bits = @bitCast(@as(u4, 0b1101));
-        const my_bits: Bits = .{};
+        const my_bits: Bits = .{
+            .a = 1,
+            .c = 1,
+            .d = 1
+        };
         if (my_bits != expected) complain(my_bits, expected, @src());
     }
 }

@@ -13,9 +13,9 @@ comptime {
     const s: S = .{ .a = true, .b = -1 };
     switch (s) {
         .{ .a = true, .b = -1 } => {}, // ok!
-        .{ .a = true, .b = ??? },
-        .{ .a = ???, .b = 0 },
-        .{ .a = ???, .b = ??? },
+        .{ .a = true, .b = 0 },
+        .{ .a = false, .b = 0 },
+        .{ .a = false, .b = -1 },
         => @compileError("We don't want to end up here!"),
     }
 }
@@ -39,7 +39,6 @@ comptime {
         .{ .a = 3 } => {}, // ok!
         .{ .a = 2 },
         .{ .b = 1 },
-        .{ .b = -1 },
         .{ .a = 0 },
         => @compileError("We don't want to end up here!"),
     }
@@ -65,7 +64,7 @@ pub fn main() void {
     // Reminder: if the sign bit of a float is set, the number is negative!
 
     var number: Float = .{ .value = 2.34 };
-    number.bits.??? = ???;
+    number.bits.sign = 1;
     if (number.value != -2.34) {
         std.debug.print("Make it negative!\n", .{});
     }
