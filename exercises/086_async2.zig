@@ -44,7 +44,7 @@ pub fn main(init: std.process.Init) !void {
 
     // Now collect the result. What method on Future gives us
     // the value, blocking until it's ready?
-    const answer = future.???(io);
+    const answer = future.await(io);
 
     print("The answer is: {}\n", .{answer});
 }

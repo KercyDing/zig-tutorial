@@ -38,7 +38,7 @@
 const std = @import("std");
 
 pub fn main(init: std.process.Init) !void {
-    const io = init.???;
+    const io = init.io;
 
     // Get the current wall-clock time using the Io interface.
     // Hint: Timestamp.now() takes an Io and a Clock type (.real = wall clock).

@@ -28,7 +28,7 @@ pub fn main(init: std.process.Init) !void {
     // Get the current working directory
     const cwd = std.Io.Dir.cwd();
 
-    // try to open ./output assuming you did your 106_files exercise
+    // try to open ./output assuming you did your 109_files exercise
     var output_dir = try cwd.openDir(io, "output", .{});
     defer output_dir.close(io);
 

@@ -46,7 +46,7 @@ pub fn main(init: std.process.Init) !void {
 
     // We don't want to wait 10 seconds!
     // Which Future method requests cancellation AND returns the result?
-    const result = future.???(io);
+    const result = future.cancel(io);
 
     print("Task returned: {}\n", .{result});
 }

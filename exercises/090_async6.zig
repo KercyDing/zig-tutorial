@@ -50,17 +50,17 @@ pub fn main(init: std.process.Init) !void {
     sel.async(.hare, runHare, .{io});
     sel.async(.tortoise, runTortoise, .{io});
 
+    // Clean up the loser — we don't need their result.
+    defer sel.cancelDiscard();
+
     // Wait for the first finisher.
     // What Select method returns the first completed result?
-    const winner = try sel.???();
+    const winner = try sel.await();
 
     switch (winner) {
         .hare => |msg| print("Hare: {s}\n", .{msg}),
         .tortoise => |msg| print("Tortoise: {s}\n", .{msg}),
     }
-
-    // Clean up the loser — we don't need their result.
-    sel.cancelDiscard();
 }
 
 fn runHare(io: std.Io) []const u8 {

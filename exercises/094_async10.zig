@@ -51,8 +51,8 @@ fn importantTask(io: std.Io) []const u8 {
 
     // Protect this section from cancellation.
     // What method swaps the cancel protection state?
-    const old = io.???(.blocked);
-    defer _ = io.???(old);
+    const old = io.swapCancelProtection(.blocked);
+    defer _ = io.swapCancelProtection(old);
 
     // This sleep will NOT return error.Canceled even though
     // we get canceled during it — protection is active!

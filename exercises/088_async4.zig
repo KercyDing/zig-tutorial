@@ -35,10 +35,11 @@ pub fn main(init: std.process.Init) !void {
     group.async(io, doWork, .{ io, 1 });
     group.async(io, doWork, .{ io, 3 });
     group.async(io, doWork, .{ io, 2 });
+    defer _ = group.cancel(io);
 
     // Wait for all tasks to finish.
     // What Group method blocks until all tasks complete?
-    try group.???(io);
+    try group.await(io);
 
     print("All tasks finished!\n", .{});
 }

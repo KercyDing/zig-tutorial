@@ -28,7 +28,7 @@ pub fn main(init: std.process.Init) !void {
     // Launch both tasks asynchronously.
     var future_a = io.async(slowAdd, .{ 1, 2 });
     defer _ = future_a.cancel(io);
-    var future_b = ???(slowMul, .{ 6, 7 });
+    var future_b = io.async(slowMul, .{ 6, 7 });
     defer _ = future_b.cancel(io);
 
     // Await both results.
