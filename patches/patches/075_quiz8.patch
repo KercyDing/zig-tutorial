@@ -1,5 +1,5 @@
---- exercises/075_quiz8.zig	2023-11-21 14:48:15.440702720 +0100
-+++ answers/075_quiz8.zig	2023-11-21 14:50:23.453311616 +0100
+--- exercises/075_quiz8.zig
++++ answers/075_quiz8.zig
 @@ -49,7 +49,11 @@
  //
  // Please fill in the body of this function!
@@ -13,3 +13,21 @@
  }
  
  // Using our new function, these path definitions take up considerably less
+@@ -97,7 +101,7 @@
+ };
+ 
+ const HermitsNotebook = struct {
+-    entries: [place_count]?NotebookEntry = .{null} ** place_count,
++    entries: [place_count]?NotebookEntry = @splat(null),
+     next_entry: u8 = 0,
+     end_of_entries: u8 = 0,
+ 
+@@ -193,7 +197,7 @@
+         }
+     }
+ 
+-    var trip = [_]?TripItem{null} ** (place_count * 2);
++    var trip: [place_count * 2]?TripItem = @splat(null);
+ 
+     notebook.getTripTo(trip[0..], destination) catch |err| {
+         print("Oh no! {}\n", .{err});

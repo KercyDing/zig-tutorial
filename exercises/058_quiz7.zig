@@ -224,11 +224,11 @@ const NotebookEntry = struct {
 // +---+----------------+----------------+----------+
 //
 const HermitsNotebook = struct {
-    // Remember the array repetition operator `**`? It is no mere
-    // novelty, it's also a great way to assign multiple items in an
-    // array without having to list them one by one. Here we use it to
-    // initialize an array with null values.
-    entries: [place_count]?NotebookEntry = .{null} ** place_count,
+    // Remember the array repetition function `@splat()`? It is a great
+    // way to assign multiple items in an array without having to list
+    // them one by one. Here we use it to initialize an array with null
+    // values.
+    entries: [place_count]?NotebookEntry = @splat(null),
 
     // The next entry keeps track of where we are in our "todo" list.
     next_entry: u8 = 0,
@@ -409,7 +409,7 @@ pub fn main() void {
     // aside memory for the trip and have the hermit's notebook fill
     // in the trip from the destination back to the path. Note that
     // this is the first time we've actually used the destination!
-    var trip = [_]?TripItem{null} ** (place_count * 2);
+    var trip: [place_count * 2]?TripItem = @splat(null);
 
     notebook.getTripTo(trip[0..], destination) catch |err| {
         print("Oh no! {}\n", .{err});

@@ -93,45 +93,38 @@ pub fn main() void {
 
     print("He has room in his heart for:", .{});
 
-    // A StructFields array
-    const fields = @typeInfo(Narcissus).@"struct".fields;
+    // `field_names` is a slice of strings and it holds the names of
+    // the struct's fields.
+    const field_names = @typeInfo(Narcissus).@"struct".field_names;
 
-    // 'fields' is a slice of StructFields. Here's the declaration:
-    //
-    //     pub const StructField = struct {
-    //         name: [:0]const u8,
-    //         type: type,
-    //         default_value_ptr: ?*const anyopaque,
-    //         is_comptime: bool,
-    //         alignment: comptime_int,
-    //
-    //         defaultValue() ?sf.type  // Function that loads the
-    //                                  // field's default value from
-    //                                  // `default_value_ptr`
-    //     };
-    //
+    // `field_types` is a slice of types and it holds the types of the
+    // struct's fields. It is guaranteed to be the same length as
+    // `field_names`.
+    const field_types = @typeInfo(Narcissus).@"struct".field_types;
+
     // Please complete these 'if' statements so that the field
     // name will not be printed if the field is of type 'void'
     // (which is a zero-bit type that takes up no space at all!):
-    if (fields[0].type != void) {
-        print(" {s}", .{fields[0].name});
+    if (field_types[0] != void) {
+        print(" {s}", .{field_names[0]});
     }
 
-    if (fields[1].type != void) {
-        print(" {s}", .{fields[1].name});
+    if (field_types[1] != void) {
+        print(" {s}", .{field_names[1]});
     }
 
-    if (fields[2].type != void) {
-        print(" {s}", .{fields[2].name});
+    if (field_types[2] != void) {
+        print(" {s}", .{field_names[2]});
     }
 
     // Yuck, look at all that repeated code above! I don't know
     // about you, but it makes me itchy.
     //
     // Alas, we can't use a regular 'for' loop here because
-    // 'fields' can only be evaluated at compile time.  It seems
-    // like we're overdue to learn about this "comptime" stuff,
-    // doesn't it? Don't worry, we'll get there.
+    // 'field_names' and 'field_types' can only be evaluated at
+    // compile time.  It seems like we're overdue to learn about
+    // this "comptime" stuff, doesn't it? Don't worry, we'll get
+    // there.
 
     print(".\n", .{});
 }

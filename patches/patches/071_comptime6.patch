@@ -1,11 +1,23 @@
---- exercises/071_comptime6.zig	2024-09-02 19:21:50.250454978 +0200
-+++ answers/071_comptime6.zig	2024-09-02 19:21:23.553250563 +0200
-@@ -40,7 +40,7 @@
+--- exercises/071_comptime6.zig
++++ answers/071_comptime6.zig
+@@ -36,13 +36,15 @@
+     // statement was repeated three times almost verbatim. Yuck!
+     //
+     // Please use an 'inline for' to implement the block below
+-    // for each field in the slice 'fields'!
++    // for each field in the corresponding slices (they're of the
++    // same length)!
  
-     const fields = @typeInfo(Narcissus).@"struct".fields;
+-    const fields = @typeInfo(Narcissus).@"struct".fields;
++    const field_names = @typeInfo(Narcissus).@"struct".field_names;
++    const field_types = @typeInfo(Narcissus).@"struct".field_types;
  
 -    ??? {
-+    inline for (fields) |field| {
-         if (field.type != void) {
-             print(" {s}", .{field.name});
+-        if (field.type != void) {
+-            print(" {s}", .{field.name});
++    inline for (field_types, field_names) |field_type, field_name| {
++        if (field_type != void) {
++            print(" {s}", .{field_name});
          }
+     }
+ 

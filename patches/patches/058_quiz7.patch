@@ -1,5 +1,5 @@
---- exercises/058_quiz7.zig	2024-10-28 09:06:49.448505460 +0100
-+++ answers/058_quiz7.zig	2024-10-28 09:35:14.631932322 +0100
+--- exercises/058_quiz7.zig
++++ answers/058_quiz7.zig
 @@ -192,8 +192,8 @@
              // Oops! The hermit forgot how to capture the union values
              // in a switch statement. Please capture each value as
@@ -11,6 +11,23 @@
          }
      }
  };
+@@ -224,11 +224,11 @@
+ // +---+----------------+----------------+----------+
+ //
+ const HermitsNotebook = struct {
+-    // Remember the array repetition operator `**`? It is no mere
+-    // novelty, it's also a great way to assign multiple items in an
+-    // array without having to list them one by one. Here we use it to
+-    // initialize an array with null values.
+-    entries: [place_count]?NotebookEntry = .{null} ** place_count,
++    // Remember the array repetition function `@splat()`? It is a great
++    // way to assign multiple items in an array without having to list
++    // them one by one. Here we use it to initialize an array with null
++    // values.
++    entries: [place_count]?NotebookEntry = @splat(null),
+ 
+     // The next entry keeps track of where we are in our "todo" list.
+     next_entry: u8 = 0,
 @@ -255,7 +255,7 @@
              // dereference and optional value "unwrapping" look
              // together. Remember that you return the address with the
@@ -20,8 +37,19 @@
              // Try to make your answer this long:__________;
          }
          return null;
-@@ -309,7 +309,7 @@
-     //
+@@ -300,16 +300,16 @@
+     // walk backwards from the destination's notebook entry, following
+     // the coming_from pointers back to the start. What we end up with
+     // is an array of TripItems with our trip in reverse order.
+-    //
++    
+     // We need to take the trip array as a parameter because we want
+     // the main() function to "own" the array memory. What do you
+     // suppose could happen if we allocated the array in this
+     // function's stack frame (the space allocated for a function's
+     // "local" data) and returned a pointer or slice to it?
+-    //
++    
      // Looks like the hermit forgot something in the return value of
      // this function. What could that be?
 -    fn getTripTo(self: *HermitsNotebook, trip: []?TripItem, dest: *Place) void {
@@ -29,3 +57,12 @@
          // We start at the destination entry.
          const destination_entry = self.getEntry(dest);
  
+@@ -409,7 +409,7 @@
+     // aside memory for the trip and have the hermit's notebook fill
+     // in the trip from the destination back to the path. Note that
+     // this is the first time we've actually used the destination!
+-    var trip = [_]?TripItem{null} ** (place_count * 2);
++    var trip: [place_count * 2]?TripItem = @splat(null);
+ 
+     notebook.getTripTo(trip[0..], destination) catch |err| {
+         print("Oh no! {}\n", .{err});

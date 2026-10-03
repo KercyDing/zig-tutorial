@@ -1,11 +1,28 @@
---- exercises/082_anonymous_structs3.zig	2026-02-27 13:05:46
-+++ answers/082_anonymous_structs3.zig	2026-02-27 13:07:22
-@@ -82,14 +82,14 @@
-     //         @typeInfo(Circle).@"struct".fields
+--- exercises/082_anonymous_structs3.zig
++++ answers/082_anonymous_structs3.zig
+@@ -74,33 +74,31 @@
+     //     @typeInfo() - takes a type, returns a TypeInfo union
+     //                   with fields specific to that type.
      //
-     // This will be an array of StructFields.
+-    //     The list of a struct type's fields can be found in
+-    //     TypeInfo's @"struct".fields.
++    //     The list of a struct type's field names and field types
++    //     can be found in TypeInfo's @"struct".field_names and
++    //     @"struct".field_types.
+     //
+     //     Example:
+     //
+-    //         @typeInfo(Circle).@"struct".fields
++    //         @typeInfo(Circle).@"struct".field_names
+     //
+-    // This will be an array of StructFields.
 -    const fields = ???;
-+    const fields = @typeInfo(@TypeOf(tuple)).@"struct".fields;
++    // This will be a slice of field name strings.
++    const field_names = @typeInfo(@TypeOf(tuple)).@"struct".field_names;
++
++    // And this will be a slice of field types, with the same length
++    // as 'field_names'.
++    const field_types = @typeInfo(@TypeOf(tuple)).@"struct".field_types;
  
      // 2. Loop through each field. This must be done at compile
      // time.
@@ -13,20 +30,33 @@
      //     Hint: remember 'inline' loops?
      //
 -    for (fields) |field| {
-+    inline for (fields) |field| {
++    inline for (field_names, field_types) |field_name, field_type| {
          // 3. Print the field's name, type, and value.
          //
-         //     Each 'field' in this loop is one of these:
-@@ -123,9 +123,9 @@
+-        //     Each 'field' in this loop is one of these:
+-        //
+-        //         pub const StructField = struct {
+-        //             name: [:0]const u8,
+-        //             type: type,
+-        //             default_value_ptr: ?*const anyopaque,
+-        //             is_comptime: bool,
+-        //             alignment: comptime_int,
+-        //         };
++        //     'field_name' holds the field name and 'field_type'
++        //     holds the field type.
+         //
+         //     Note we will learn about 'anyopaque' type later
+         //
+@@ -123,9 +121,9 @@
          // for declarations. If it's a value, it looks for data.
          //
          print("\"{s}\"({any}):{any} ", .{
 -            field.???,
 -            field.???,
 -            ???,
-+            field.name,
-+            field.type,
-+            @field(tuple, field.name),
++            field_name,
++            field_type,
++            @field(tuple, field_name),
          });
      }
  }

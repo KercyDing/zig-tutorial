@@ -39,7 +39,7 @@ pub fn main(init: std.process.Init) !void {
     // initialize an array of u8 with all letter 'A'
     // we need to pick the size of the array, 64 seems like a good number
     // fix the initialization below
-    var content = [_]u8{'A'} ** 64;
+    var content: [64]u8 = @splat('A');
     // this should print out : `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`
     std.debug.print("{s}\n", .{content});
 

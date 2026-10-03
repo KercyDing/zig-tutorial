@@ -39,16 +39,16 @@ pub fn main() void {
     comptime var count = 0;
 
     count += 1;
-    const a1: [count]u8 = .{'A'} ** count;
+    const a1: [count]u8 = @splat('A');
 
     count += 1;
-    const a2: [count]u8 = .{'B'} ** count;
+    const a2: [count]u8 = @splat('B');
 
     count += 1;
-    const a3: [count]u8 = .{'C'} ** count;
+    const a3: [count]u8 = @splat('C');
 
     count += 1;
-    const a4: [count]u8 = .{'D'} ** count;
+    const a4: [count]u8 = @splat('D');
 
     print("{s} {s} {s} {s}\n", .{ a1, a2, a3, a4 });
 

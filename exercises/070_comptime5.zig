@@ -25,12 +25,12 @@ const Duck = struct {
     location_x: i32 = 0,
     location_y: i32 = 0,
 
-    fn waddle(self: *Duck, x: i16, y: i16) void {
+    pub fn waddle(self: *Duck, x: i16, y: i16) void {
         self.location_x += x;
         self.location_y += y;
     }
 
-    fn quack(self: Duck) void {
+    pub fn quack(self: Duck) void {
         if (self.loudness < 4) {
             print("\"Quack.\" ", .{});
         } else {
@@ -44,12 +44,12 @@ const RubberDuck = struct {
     location_x: i32 = 0,
     location_y: i32 = 0,
 
-    fn waddle(self: *RubberDuck, x: i16, y: i16) void {
+    pub fn waddle(self: *RubberDuck, x: i16, y: i16) void {
         self.location_x += x;
         self.location_y += y;
     }
 
-    fn quack(self: RubberDuck) void {
+    pub fn quack(self: RubberDuck) void {
         // Assigning an expression to '_' allows us to safely
         // "use" the value while also ignoring it.
         _ = self;

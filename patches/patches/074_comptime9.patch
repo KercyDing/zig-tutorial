@@ -1,30 +1,29 @@
---- exercises/074_comptime9.zig	2026-04-11 21:35:08.132459373 -0700
-+++ answers/074_comptime9.zig	2026-04-12 07:13:37.971010827 -0700
-@@ -27,12 +27,12 @@
-         start, // Ready to start a new animal.
-         l, // This means we've seen an "l", so if we see an "m", we know it's a Llama.
-     };
--    var state = State.start;
-+    comptime var state = State.start;
+--- exercises/074_comptime9.zig
++++ answers/074_comptime9.zig
+@@ -31,8 +31,8 @@
  
      // We return an array of animals representing the creature. (This is why we
      // really needed the 'count' parameter. Arrays need a size.)
-     var animals: [count]Animal = .{undefined} ** count;
+-    var animals: [count]Animal = .{undefined} ** count;
 -    var next_animal: usize = 0;
++    var animals: [count]Animal = undefined;
 +    comptime var next_animal: usize = 0;
  
      inline for (fmt) |char| {
  
-@@ -56,7 +56,7 @@
+@@ -56,7 +56,10 @@
                  //
                  // What do you think happens with Gators? Do they join with
                  // other animals or is this an error?
 -                'g' => ???,
-+                'g' => @compileError("Gators refuse to join with other animals."),
++                'g' => {
++                    animals[next_animal] = .Gator;
++                    next_animal += 1;
++                },
  
                  else => @compileError("No animal starts with '" ++ char ++ "'!"),
              },
-@@ -68,7 +68,7 @@
+@@ -68,7 +71,7 @@
                      next_animal += 1;
                      // Something is missing here. After we finish a Llama, we
                      // need to be ready to _start_ over with a new animal...
@@ -33,3 +32,12 @@
                  },
  
                  else => @compileError("Only llamas start with 'l'!"),
+@@ -99,7 +102,7 @@
+     //
+     // You can solve this by adding "comptime" to two of the variables in
+     // makeCreature...
+-    const creature = makeCreature(2, "mlm");
++    const creature = comptime makeCreature(2, "mlm");
+ 
+     for (creature) |animal| {
+         // @tagName gives us a string representing which variant of an enum we

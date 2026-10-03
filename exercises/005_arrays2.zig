@@ -7,12 +7,14 @@
 //   const b = [_]u8{ 3,4 };
 //   const c = a ++ b ++ [_]u8{ 5 }; // equals 1 2 3 4 5
 //
-// You can use '**' to repeat an array:
+// Array repetition used to be written with a '**' operator, but that
+// operator was removed from the language. These days you repeat an
+// array by concatenating it with itself:
 //
-//   const d = [_]u8{ 1,2,3 } ** 2; // equals 1 2 3 1 2 3
+//   const d = [_]u8{ 1,2,3 } ++ [_]u8{ 1,2,3 }; // equals 1 2 3 1 2 3
 //
-// Note that both '++' and '**' only operate on arrays while your
-// program is _being compiled_. This special time is known in Zig
+// Note that '++' only operates on arrays while your program is
+// _being compiled_. This special time is known in Zig
 // parlance as "comptime" and we'll learn plenty more about that
 // later.
 //
@@ -30,7 +32,7 @@ pub fn main() void {
     // (Problem 2)
     // Please set this array using repetition.
     // It should result in: 1 0 0 1 1 0 0 1 1 0 0 1
-    const bit_pattern = [_]u8{ 1, 0, 0, 1 } ** 3;
+    const bit_pattern = [_]u8{ 1, 0, 0, 1 } ++ [_]u8{ 1, 0, 0, 1 } ++ [_]u8{ 1, 0, 0, 1 };
 
     // Okay, that's all of the problems. Let's see the results.
     //

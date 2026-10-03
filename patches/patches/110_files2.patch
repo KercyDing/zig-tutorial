@@ -1,11 +1,28 @@
---- exercises/110_files2.zig	2026-03-20 19:23:48.874150121 +0100
-+++ answers/110_files2.zig	2026-04-02 10:51:15.815831734 +0200
+--- exercises/110_files2.zig
++++ answers/110_files2.zig
+@@ -1,6 +1,6 @@
+ //
+ // Prerequisite :
+-//    - exercise/106_files.zig, or
++//    - exercise/109_files.zig, or
+ //    - create a file {project_root}/output/zigling.txt
+ //      with content `It's zigling time!`(18 bytes total)
+ //
+@@ -28,7 +28,7 @@
+     // Get the current working directory
+     const cwd = std.Io.Dir.cwd();
+ 
+-    // try to open ./output assuming you did your 106_files exercise
++    // try to open ./output assuming you did your 109_files exercise
+     var output_dir = try cwd.openDir(io, "output", .{});
+     defer output_dir.close(io);
+ 
 @@ -39,7 +39,7 @@
      // initialize an array of u8 with all letter 'A'
      // we need to pick the size of the array, 64 seems like a good number
      // fix the initialization below
 -    var content = ['A']*64;
-+    var content = [_]u8{'A'} ** 64;
++    var content: [64]u8 = @splat('A');
      // this should print out : `AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`
      std.debug.print("{s}\n", .{content});
  

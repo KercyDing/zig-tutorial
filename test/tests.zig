@@ -1,413 +1,160 @@
+//!
+//! Command line interface tests for Ziglings.
+//!
+//! Zig 0.17 removed custom build steps, so these tests are expressed with
+//! declarative `Run` steps. Two corpora are prepared in temporary directories:
+//!
+//!   * "broken": the original exercises as they were introduced, taken from
+//!     git history.
+//!   * "healed": the broken exercises with their patches applied.
+//!
+//! The `elrond` program is then launched directly to check every healed
+//! exercise, the whole healed corpus, and every hint of the broken corpus.
+//!
 const std = @import("std");
-const root = @import("../build.zig");
+const elrond = @import("../tools/elrond.zig");
 
-const debug = std.debug;
-const fmt = std.fmt;
-const mem = std.mem;
-
-const Allocator = std.mem.Allocator;
-const Process = std.process;
 const Build = std.Build;
 const Step = Build.Step;
-const RunStep = Build.RunStep;
-const LazyPath = Build.LazyPath;
+const Exercise = elrond.Exercise;
 
-const Exercise = root.Exercise;
+/// Prepares the broken and healed corpora. The first argument is the directory
+/// for the original (broken) exercises, the second for the healed ones.
+const prepare_script =
+    \\set -e
+    \\broken_dir="$1"
+    \\healed_dir="$2"
+    \\mkdir -p "$broken_dir" "$healed_dir"
+    \\rm -f .zig-cache/test-progress.txt .zig-cache/test-progress-all.txt .zig-cache/test-progress-hints.txt
+    \\for src in exercises/*.zig; do
+    \\    name=$(basename "$src" .zig)
+    \\    commit=$(git log --diff-filter=A --format=%H -1 -- "$src")
+    \\    git show "$commit:$src" > "$broken_dir/$name.zig"
+    \\    cp "$broken_dir/$name.zig" "$healed_dir/$name.zig"
+    \\    if [ -f "patches/patches/$name.patch" ]; then
+    \\        patch -s --no-backup-if-mismatch -N -r - -i "patches/patches/$name.patch" "$healed_dir/$name.zig" || true
+    \\    fi
+    \\done
+;
 
-pub fn addCliTests(b: *std.Build, exercises: []const Exercise) *Step {
+pub fn addCliTests(b: *Build, exercises: []const Exercise) *Step {
     const step = b.step("test-cli", "Test the command line interface");
 
+    const broken_dir = b.tmpPath();
+    const healed_dir = b.tmpPath();
+
+    const prepare = b.addSystemCommand(&.{ "sh", "-c", prepare_script, "prepare" });
+    prepare.setCwd(b.path("."));
+    prepare.addDirectoryArg(broken_dir);
+    prepare.addDirectoryArg(healed_dir);
+    prepare.expectExitCode(0);
+
+    const elrond_exe = b.addExecutable(.{
+        .name = "elrond",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/elrond.zig"),
+            .target = b.graph.host,
+        }),
+    });
+
+    // case-1: every healed exercise passes on its own, as `zig build -Dhealed
+    // -Dn=n` would run it.
+    for (exercises[0 .. exercises.len - 1]) |ex| {
+        const n = ex.number();
+
+        const run = addHealedRun(b, elrond_exe, healed_dir, ".zig-cache/test-progress.txt");
+        run.setName(b.fmt("check -Dn={}", .{n}));
+        run.addArg(b.fmt("--only={d}", .{n}));
+        run.expectExitCode(0);
+        run.expectStdErrMatch(if (ex.skip) "Skipping" else "PASSED");
+        run.step.dependOn(&prepare.step);
+        step.dependOn(&run.step);
+    }
+
+    // case-2: the whole healed corpus passes in order.
     {
-        // Test that `zig build -Dhealed -Dn=n` selects the nth exercise.
-        const case_step = createCase(b, "case-1");
+        const run = addHealedRun(b, elrond_exe, healed_dir, ".zig-cache/test-progress-all.txt");
+        run.setName("check all healed");
+        run.expectExitCode(0);
+        run.step.dependOn(&prepare.step);
+        step.dependOn(&run.step);
+    }
 
-        const tmp_path = createTempPath(b) catch |err| {
-            return fail(step, "unable to make tmp path: {s}\n", .{@errorName(err)});
-        };
-        defer deleteTmpPath(b, tmp_path);
+    // case-3: an unsolved exercise reports its hint and exits with code 2, as
+    // `zig build -Dn=n` would.
+    for (exercises[0 .. exercises.len - 1]) |ex| {
+        if (ex.skip) continue;
 
-        const heal_step = HealStep.create(b, exercises, tmp_path);
-
-        for (exercises[0 .. exercises.len - 1]) |ex| {
+        if (ex.hint) |hint| {
             const n = ex.number();
 
-            const cmd = b.addSystemCommand(&.{
-                b.graph.zig_exe,
-                "build",
-                "-Dhealed",
-                b.fmt("-Dhealed-path={s}", .{tmp_path}),
-                b.fmt("-Dn={}", .{n}),
-            });
-            cmd.setName(b.fmt("zig build -Dhealed -Dn={}", .{n}));
-            cmd.expectExitCode(0);
-            cmd.step.dependOn(&heal_step.step);
-
-            const stderr = cmd.captureStdErr(.{});
-            const verify = CheckNamedStep.create(b, ex, stderr);
-            verify.step.dependOn(&cmd.step);
-
-            case_step.dependOn(&verify.step);
+            const run = addBrokenRun(b, elrond_exe, broken_dir);
+            run.setName(b.fmt("hint -Dn={}", .{n}));
+            run.addArg(b.fmt("--only={d}", .{n}));
+            run.expectExitCode(2);
+            run.expectStdErrMatch(hint);
+            run.step.dependOn(&prepare.step);
+            step.dependOn(&run.step);
         }
     }
 
+    // case-4: `build.zig` forwards its options to the program. The progress
+    // file is redirected so the tests cannot clobber `.progress.txt`.
     {
-        // Test that `zig build -Dhealed` processes all the exercises in order.
-        const case_step = createCase(b, "case-2");
-
-        const tmp_path = createTempPath(b) catch |err| {
-            return fail(step, "unable to make tmp path: {s}\n", .{@errorName(err)});
-        };
-        defer deleteTmpPath(b, tmp_path);
-
-        const heal_step = HealStep.create(b, exercises, tmp_path);
-        heal_step.step.dependOn(case_step);
-
-        // TODO: when an exercise is modified, the cache is not invalidated.
-        const cmd = b.addSystemCommand(&.{
+        const run = b.addSystemCommand(&.{ b.graph.zig_exe, "build", "-Dn=1" });
+        run.setName("zig build -Dn=1");
+        run.setCwd(b.path("."));
+        run.setEnvironmentVariable("ZIGLINGS_PROGRESS_FILE", ".zig-cache/test-progress.txt");
+        run.expectExitCode(0);
+        run.expectStdErrMatch("PASSED");
+        run.step.dependOn(&prepare.step);
+        step.dependOn(&run.step);
+    }
+    {
+        const run = b.addSystemCommand(&.{
             b.graph.zig_exe,
             "build",
             "-Dhealed",
-            b.fmt("-Dhealed-path={s}", .{tmp_path}),
+            "-Dn=2",
         });
-        cmd.setName("zig build -Dhealed");
-        cmd.expectExitCode(0);
-        cmd.step.dependOn(&heal_step.step);
-
-        const stderr = cmd.captureStdErr(.{});
-        const verify = CheckStep.create(b, exercises, stderr);
-        verify.step.dependOn(&cmd.step);
-    }
-
-    {
-        // Test that `zig build -Dn=n` prints the hint.
-        const case_step = createCase(b, "case-3");
-
-        for (exercises[0 .. exercises.len - 1]) |ex| {
-            if (ex.skip) continue;
-
-            if (ex.hint) |hint| {
-                const n = ex.number();
-
-                const cmd = b.addSystemCommand(&.{
-                    b.graph.zig_exe,
-                    "build",
-                    b.fmt("-Dn={}", .{n}),
-                });
-                cmd.setName(b.fmt("zig build -Dn={}", .{n}));
-                cmd.expectExitCode(2);
-                cmd.addCheck(.{ .expect_stderr_match = hint });
-
-                case_step.dependOn(&cmd.step);
-            }
-        }
-
-        step.dependOn(case_step);
+        run.setName("zig build -Dhealed -Dn=2");
+        run.setCwd(b.path("."));
+        run.addPrefixedDirectoryArg("-Dhealed-path=", healed_dir);
+        run.setEnvironmentVariable("ZIGLINGS_PROGRESS_FILE", ".zig-cache/test-progress.txt");
+        run.expectExitCode(0);
+        run.expectStdErrMatch("PASSED");
+        run.step.dependOn(&prepare.step);
+        step.dependOn(&run.step);
     }
 
     return step;
 }
 
-fn createCase(b: *Build, name: []const u8) *Step {
-    const case_step = b.allocator.create(Step) catch @panic("OOM");
-    case_step.* = Step.init(.{
-        .id = .custom,
-        .name = name,
-        .owner = b,
-    });
-
-    return case_step;
+/// Runs an exercise from a prepared corpus.
+fn addCorpusRun(
+    b: *Build,
+    elrond_exe: *Step.Compile,
+    corpus_dir: Build.LazyPath,
+    progress_name: []const u8,
+) *Step.Run {
+    const run = b.addRunArtifact(elrond_exe);
+    run.setCwd(b.path("."));
+    run.addArg(b.fmt("--zig={s}", .{b.graph.zig_exe}));
+    run.addArg(b.fmt("--root-path={s}", .{b.root.root_dir.path.?}));
+    run.addPrefixedDirectoryArg("--work-path=", corpus_dir);
+    run.addArg(b.fmt("--progress-path={s}", .{progress_name}));
+    return run;
 }
 
-/// Checks the output of `zig build -Dn=n`.
-const CheckNamedStep = struct {
-    step: Step,
-    exercise: Exercise,
-    stderr: LazyPath,
-
-    pub fn create(owner: *Build, exercise: Exercise, stderr: LazyPath) *CheckNamedStep {
-        const self = owner.allocator.create(CheckNamedStep) catch @panic("OOM");
-        self.* = .{
-            .step = Step.init(.{
-                .id = .custom,
-                .name = "check-named",
-                .owner = owner,
-                .makeFn = make,
-            }),
-            .exercise = exercise,
-            .stderr = stderr,
-        };
-
-        return self;
-    }
-
-    fn make(step: *Step, _: Step.MakeOptions) !void {
-        const b = step.owner;
-        const io = b.graph.io;
-        const self: *CheckNamedStep = @alignCast(@fieldParentPtr("step", step));
-        const ex = self.exercise;
-
-        const stderr_file = try std.Io.Dir.cwd().openFile(
-            io,
-            self.stderr.getPath(b),
-            .{ .mode = .read_only },
-        );
-        defer stderr_file.close(io);
-
-        var stderr = stderr_file.readerStreaming(io, &.{});
-        {
-            // Skip the logo.
-            const nlines = mem.count(u8, root.logo, "\n");
-            var buf: [80]u8 = undefined;
-
-            var lineno: usize = 0;
-            while (lineno < nlines) : (lineno += 1) {
-                _ = try readLine(&stderr, &buf);
-            }
-        }
-        try check_output(step, ex, &stderr);
-    }
-};
-
-/// Checks the output of `zig build`.
-const CheckStep = struct {
-    step: Step,
-    exercises: []const Exercise,
-    stderr: LazyPath,
-
-    pub fn create(
-        owner: *Build,
-        exercises: []const Exercise,
-        stderr: LazyPath,
-    ) *CheckStep {
-        const self = owner.allocator.create(CheckStep) catch @panic("OOM");
-        self.* = .{
-            .step = Step.init(.{
-                .id = .custom,
-                .name = "check",
-                .owner = owner,
-                .makeFn = make,
-            }),
-            .exercises = exercises,
-            .stderr = stderr,
-        };
-
-        return self;
-    }
-
-    fn make(step: *Step, _: Step.MakeOptions) !void {
-        const b = step.owner;
-        const io = b.graph.io;
-        const self: *CheckStep = @alignCast(@fieldParentPtr("step", step));
-        const exercises = self.exercises;
-
-        const stderr_file = try std.Io.Dir.cwd().openFile(
-            io,
-            self.stderr.getPath(b),
-            .{ .mode = .read_only },
-        );
-        defer stderr_file.close(io);
-
-        var stderr = stderr_file.readerStreaming(io, &.{});
-        for (exercises) |ex| {
-            if (ex.number() == 1) {
-                // Skip the logo.
-                const nlines = mem.count(u8, root.logo, "\n");
-                var buf: [80]u8 = undefined;
-
-                var lineno: usize = 0;
-                while (lineno < nlines) : (lineno += 1) {
-                    _ = try readLine(&stderr, &buf);
-                }
-            }
-            try check_output(step, ex, &stderr);
-        }
-    }
-};
-
-fn check_output(step: *Step, exercise: Exercise, reader: *std.Io.File.Reader) !void {
-    const b = step.owner;
-
-    var buf: [1024]u8 = undefined;
-    if (exercise.skip) {
-        {
-            const actual = try readLine(reader, &buf) orelse "EOF";
-            const expect = b.fmt("Skipping {s}", .{exercise.main_file});
-            try check(step, exercise, expect, actual);
-        }
-
-        {
-            const actual = try readLine(reader, &buf) orelse "EOF";
-            try check(step, exercise, "", actual);
-        }
-
-        return;
-    }
-
-    {
-        const actual = try readLine(reader, &buf) orelse "EOF";
-        const expect = b.fmt("Compiling {s}...", .{exercise.main_file});
-        try check(step, exercise, expect, actual);
-    }
-
-    {
-        const actual = try readLine(reader, &buf) orelse "EOF";
-        const expect = b.fmt("Checking {s}...", .{exercise.main_file});
-        try check(step, exercise, expect, actual);
-    }
-
-    {
-        const actual = try readLine(reader, &buf) orelse "EOF";
-        const expect = switch (exercise.kind) {
-            .exe => "PASSED:",
-            .@"test" => "PASSED",
-        };
-        try check(step, exercise, expect, actual);
-    }
-
-    // Skip the exercise output.
-    const nlines = switch (exercise.kind) {
-        .exe => 1 + mem.count(u8, exercise.output, "\n") + 1,
-        .@"test" => 1,
-    };
-
-    var lineno: usize = 0;
-    while (lineno < nlines) : (lineno += 1) {
-        _ = try readLine(reader, &buf) orelse @panic("EOF");
-    }
+fn addHealedRun(
+    b: *Build,
+    elrond_exe: *Step.Compile,
+    healed_dir: Build.LazyPath,
+    progress_name: []const u8,
+) *Step.Run {
+    return addCorpusRun(b, elrond_exe, healed_dir, progress_name);
 }
 
-fn check(
-    step: *Step,
-    exercise: Exercise,
-    expect: []const u8,
-    actual: []const u8,
-) !void {
-    if (!mem.eql(u8, expect, actual)) {
-        return step.fail("{s}: expected to see \"{s}\", found \"{s}\"", .{
-            exercise.main_file,
-            expect,
-            actual,
-        });
-    }
-}
-
-fn readLine(reader: *std.Io.File.Reader, buf: []u8) !?[]const u8 {
-    try reader.interface.readSliceAll(buf);
-    return mem.trimEnd(u8, buf, " \r\n");
-}
-
-/// Fails with a custom error message.
-const FailStep = struct {
-    step: Step,
-    error_msg: []const u8,
-
-    pub fn create(owner: *Build, error_msg: []const u8) *FailStep {
-        const self = owner.allocator.create(FailStep) catch @panic("OOM");
-        self.* = .{
-            .step = Step.init(.{
-                .id = .custom,
-                .name = "fail",
-                .owner = owner,
-                .makeFn = make,
-            }),
-            .error_msg = error_msg,
-        };
-
-        return self;
-    }
-
-    fn make(step: *Step, _: Step.MakeOptions) !void {
-        const b = step.owner;
-        const self: *FailStep = @alignCast(@fieldParentPtr("step", step));
-
-        try step.result_error_msgs.append(b.allocator, self.error_msg);
-        return error.MakeFailed;
-    }
-};
-
-/// A variant of `std.Build.Step.fail` that does not return an error so that it
-/// can be used in the configuration phase.  It returns a FailStep, so that the
-/// error will be cleanly handled by the build runner.
-fn fail(step: *Step, comptime format: []const u8, args: anytype) *Step {
-    const b = step.owner;
-
-    const fail_step = FailStep.create(b, b.fmt(format, args));
-    step.dependOn(&fail_step.step);
-
-    return step;
-}
-
-/// Heals the exercises.
-const HealStep = struct {
-    step: Step,
-    exercises: []const Exercise,
-    work_path: []const u8,
-
-    pub fn create(owner: *Build, exercises: []const Exercise, work_path: []const u8) *HealStep {
-        const self = owner.allocator.create(HealStep) catch @panic("OOM");
-        self.* = .{
-            .step = Step.init(.{
-                .id = .custom,
-                .name = "heal",
-                .owner = owner,
-                .makeFn = make,
-            }),
-            .exercises = exercises,
-            .work_path = work_path,
-        };
-
-        return self;
-    }
-
-    fn make(step: *Step, _: Step.MakeOptions) !void {
-        const b = step.owner;
-        const self: *HealStep = @alignCast(@fieldParentPtr("step", step));
-
-        return heal(b.allocator, self.exercises, self.work_path);
-    }
-};
-
-/// Heals all the exercises.
-fn heal(allocator: Allocator, exercises: []const Exercise, work_path: []const u8) !void {
-    const io = std.Options.debug_io;
-    const sep = std.Io.Dir.path.sep_str;
-    const join = std.Io.Dir.path.join;
-
-    const exercises_path = "exercises";
-    const patches_path = "patches" ++ sep ++ "patches";
-
-    for (exercises) |ex| {
-        const name = ex.name();
-
-        const file = try join(allocator, &.{ exercises_path, ex.main_file });
-        const patch = b: {
-            const patch_name = try fmt.allocPrint(allocator, "{s}.patch", .{name});
-            break :b try join(allocator, &.{ patches_path, patch_name });
-        };
-        const output = try join(allocator, &.{ work_path, ex.main_file });
-
-        const argv = &.{ "patch", "-i", patch, "-o", output, "-s", file };
-
-        _ = try Process.run(allocator, io, .{ .argv = argv });
-    }
-}
-
-fn createTempPath(b: *Build) ![]const u8 {
-    const io = b.graph.io;
-    const rand_int = r: {
-        var x: u64 = undefined;
-        io.random(@ptrCast(&x));
-        break :r x;
-    };
-    const tmp_dir_sub_path = "tmp" ++ std.Io.Dir.path.sep_str ++ std.fmt.hex(rand_int);
-    const result_path = b.cache_root.join(b.allocator, &.{tmp_dir_sub_path}) catch @panic("OOM");
-    try b.cache_root.handle.createDirPath(io, tmp_dir_sub_path);
-    return result_path;
-}
-
-fn deleteTmpPath(b: *Build, path: []const u8) void {
-    const io = b.graph.io;
-    std.Io.Dir.cwd().deleteTree(io, path) catch |err| {
-        std.log.warn("failed to delete {s}: {t}", .{ path, err });
-    };
+fn addBrokenRun(b: *Build, elrond_exe: *Step.Compile, broken_dir: Build.LazyPath) *Step.Run {
+    return addCorpusRun(b, elrond_exe, broken_dir, ".zig-cache/test-progress-hints.txt");
 }
